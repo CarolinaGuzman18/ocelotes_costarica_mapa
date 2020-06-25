@@ -1,0 +1,90 @@
+---
+title: "Ocelotes en Costa Rica"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(sf)
+library(raster)
+library(rgbif)
+library(protolite)
+library(dplyr)
+library(leaflet)
+
+cr_geo <- st_read("https://gist.githubusercontent.com/arce/9357998/raw/b58610d0d9e149682eda5b350a8f74dfb3452cb8/division.json")
+```
+
+### Chart A
+
+```{r}
+leopardus_pardalis_gbif <- 
+  occ_search(
+    scientificName = 'Leopardus pardalis', 
+    country = 'CR',
+    hasCoordinate = TRUE, 
+    hasGeospatialIssue = FALSE,
+    fields = c('scientificName', 'decimalLongitude', 'decimalLatitude'),
+    limit = 1500
+  )
+
+leopardus_pardalis_sf <- 
+  st_as_sf(leopardus_pardalis_gbif$data, 
+           coords = c("decimalLongitude", "decimalLatitude"), 
+           crs = 4326
+  )
+
+altitude <- getData("worldclim", var="alt", res=.5, lon=-84, lat=10)
+arg_altitud <-
+  altitude %>%
+  crop(cr_geo) %>%
+  mask(cr_geo)
+
+```
+
+```{r}
+pal <- colorNumeric(
+  c("#F4CB1F", "#F4771F", "#F41F1F"), 
+  values(arg_altitud), 
+  na.color = "transparent"
+)
+
+# Mapa web
+m <- leaflet() %>% 
+  addProviderTiles(providers$Esri.WorldImagery, group = "Imágenes de ESRI") %>% 
+  addProviderTiles(providers$Stamen.TonerLite, group = "Stamen Toner Lite") %>%
+  addProviderTiles(providers$OpenStreetMap.Mapnik, group = "OpenStreetMap") %>%
+  addCircleMarkers(data = leopardus_pardalis_sf,
+                   stroke = F,
+                   radius = 4,
+                   fillColor = 'black',
+                   fillOpacity = 1,
+                   group = "Ocelotes",
+                   
+  ) %>%
+  addRasterImage(arg_altitud, 
+                 colors = pal, 
+                 opacity = 0.8, 
+                 group = "Altitud"
+  ) %>%
+  addLayersControl(
+    baseGroups = c("OpenStreetMap", "Stamen Toner Lite", "Imágenes de ESRI"),
+    overlayGroups = c("Altitud", "Ocelotes"),
+    options = layersControlOptions(collapsed = FALSE)    
+  ) %>%
+  addLegend(pal = pal, 
+            values = values(arg_altitud), 
+            title = "Altitud"
+  ) %>%
+  addMiniMap(
+    toggleDisplay = TRUE,
+    position = "bottomleft",
+    tiles = providers$Stamen.TonerLite
+  )
+
+m
+```
+
