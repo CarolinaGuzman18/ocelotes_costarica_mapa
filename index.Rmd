@@ -1,5 +1,5 @@
 ---
-title: "Pandas en China"
+title: "Ocelotes en Costa Rica"
 output: 
   flexdashboard::flex_dashboard:
     orientation: columns
